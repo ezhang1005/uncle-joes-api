@@ -29,5 +29,12 @@ def get_bq_client():
 def read_root():
     return {"status": "healthy"}
 
-
-#hello world
+@app.get("/menu")
+def get_menu(bq: bigquery.Client = Depends(get_bq_client)):
+    # The SQL query to get our coffee items
+    query = "SELECT name, price, category FROM `uncle-joes-coffee-company.uncle_joes.menu_items` LIMIT 20"
+    
+    query_job = bq.query(query)
+    results = [dict(row) for row in query_job]
+    
+    return {"items": results}
