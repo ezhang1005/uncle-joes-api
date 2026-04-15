@@ -8,15 +8,15 @@ app = FastAPI(title="Uncle Joes API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For Uncle Joes, you'll put your Cloud Run frontend URL here
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-PROJECT_ID = "uncle-joes-api"
+DATA_PROJECT = "uncle-joes-coffee-company" 
 DATASET = "uncle_joes"
-
+FULL_PATH = f"{DATA_PROJECT}.{DATASET}"
 
 def get_bq_client():
     client = bigquery.Client()
@@ -27,14 +27,49 @@ def get_bq_client():
 
 @app.get("/")
 def read_root():
-    return {"status": "healthy"}
+    return {"status": "healthy", "message": "Uncle Joe's API is online"}
 
+# --- MENU ENDPOINT ---
 @app.get("/menu")
 def get_menu(bq: bigquery.Client = Depends(get_bq_client)):
-    # The SQL query to get our coffee items
-    query = "SELECT name, price, category FROM `uncle-joes-coffee-company.uncle_joes.menu_items` LIMIT 20"
+    query = f"SELECT name, price, category FROM `{FULL_PATH}.menu_items` LIMIT 20"
+    try:
+        query_job = bq.query(query)
+        results = [dict(row) for row in query_job]
+        return {"items": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BigQuery Error: {str(e)}")
+# --- LOCATIONS ENDPOINTS ---
+@app.get("/locations")
+def get_locations(bq: bigquery.Client = Depends(get_bq_client)):
+    query = f"""
+        SELECT store_id, name, city, state, status 
+        FROM `{FULL_PATH}.locations`
+        ORDER BY name ASC
+    """
+    try:
+        query_job = bq.query(query)
+        results = [dict(row) for row in query_job]
+        return {"total": len(results), "locations": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BigQuery Error: {str(e)}")
+
+@app.get("/locations/{store_id}")
+def get_store_detail(store_id: str, bq: bigquery.Client = Depends(get_bq_client)):
+    # Using parameterized query to safely handle the store_id
+    query = f"SELECT * FROM `{FULL_PATH}.locations` WHERE store_id = @sid"
     
-    query_job = bq.query(query)
-    results = [dict(row) for row in query_job]
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[bigquery.ScalarQueryParameter("sid", "STRING", store_id)]
+    )
     
-    return {"items": results}
+    try:
+        query_job = bq.query(query, job_config=job_config)
+        results = [dict(row) for row in query_job]
+        
+        if not results:
+            raise HTTPException(status_code=404, detail=f"Store ID {store_id} not found")
+            
+        return results[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"BigQuery Error: {str(e)}")
