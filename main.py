@@ -42,11 +42,8 @@ def get_menu(bq: bigquery.Client = Depends(get_bq_client)):
 # --- LOCATIONS ENDPOINTS ---
 @app.get("/locations")
 def get_locations(bq: bigquery.Client = Depends(get_bq_client)):
-    query = f"""
-        SELECT store_id, name, city, state, status 
-        FROM `{FULL_PATH}.locations`
-        ORDER BY name ASC
-    """
+    # Try selecting * first to see all available columns if you're unsure
+    query = f"SELECT * FROM `{FULL_PATH}.locations` LIMIT 10"
     try:
         query_job = bq.query(query)
         results = [dict(row) for row in query_job]
