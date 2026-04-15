@@ -66,3 +66,39 @@ def get_locations(bq: bigquery.Client = Depends(get_bq_client)):
             status_code=500, 
             detail=f"BigQuery Error: {str(e)}"
         )
+@app.get("/locations/{location_id}")
+def get_location_detail(location_id: str, bq: bigquery.Client = Depends(get_bq_client)):
+    """
+    Fetch every detail for a specific store using its UUID.
+    """
+    # We use @lid as a placeholder to keep the query safe and clean
+    query = f"""
+        SELECT * FROM `{FULL_PATH}.locations` 
+        WHERE id = @lid
+    """
+    
+    job_config = bigquery.QueryJobConfig(
+        query_parameters=[
+            bigquery.ScalarQueryParameter("lid", "STRING", location_id)
+        ]
+    )
+    
+    try:
+        query_job = bq.query(query, job_config=job_config)
+        results = [dict(row) for row in query_job]
+        
+        # If the UUID doesn't exist, we return a clean 404 error
+        if not results:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Location with ID {location_id} not found."
+            )
+            
+        # Return the first (and only) match
+        return results[0]
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"BigQuery Error: {str(e)}"
+        )
