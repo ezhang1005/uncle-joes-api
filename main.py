@@ -4,7 +4,7 @@ from google.cloud import bigquery
 from pydantic import BaseModel
 from typing import List
 
-app = FastAPI()
+app = FastAPI(title="Uncle Joes API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -13,6 +13,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+PROJECT_ID = "uncle-joes-api"
+DATASET = "uncle_joes"
+
 
 def get_bq_client():
     client = bigquery.Client()
